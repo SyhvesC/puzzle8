@@ -7,17 +7,17 @@
 #include <stdlib.h>
 
 typedef struct Node {
-				struct Node *parent;
-				Board board;
-				int heuristic;
-				int depth;
-				int f_cost;
+	struct Node *parent;
+	Board board;
+	int heuristic;
+	int depth;
+	int f_cost;
 } Node;
 
 typedef struct {
-				Node **elements;
-				size_t size;
-				size_t capacity;
+	Node **elements;
+	size_t size;
+	size_t capacity;
 } PriorityQueue;
 
 
