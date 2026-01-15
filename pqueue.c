@@ -1,44 +1,64 @@
-#include <stdint.h>
-#include <stdlib.h>
+#include "board.h"
+#include "pqueue.h"
+
 #include <stdio.h>
 
+#define MAX_PRINT_DEPTH 100
+#define RESIZE_FACTOR 2
 
-typedef struct Node {
-				struct Node *parent;
-				int value;
-} Node;
-
-typedef struct {
-				Node **elements;
-				size_t size;
-				size_t capacity;
-} PriorityQueue;
-
-Node *create_node(int value)
+Node *create_node(Node *parent, const Board board, const int heuristic, const int depth)
 {
-				Node *a = malloc(sizeof(Node));
-				a->value = value;
-				a->parent = NULL;
-				return a;
+				Node *node = malloc(sizeof(Node));
+				if (!node) {
+								fprintf(stderr, "Error, could not allocate memory for the node!");
+								exit(-1);
+				}
+
+				node->parent = parent;
+				node->board = board;
+				node->heuristic = heuristic;
+				node->depth = depth;
+				node->f_cost = heuristic + depth;
+
+				return node;
 }
 
-void swap_nodes(PriorityQueue *pq, size_t a, size_t b)
+static void swap_nodes(PriorityQueue *pq, const size_t a, const size_t b)
 {
 				Node *temp = pq->elements[a];
 				pq->elements[a] = pq->elements[b];
 				pq->elements[b] = temp;
 }
 
+static void resize_queue(PriorityQueue *pq)
+{
+				size_t new_capacity = pq->capacity * RESIZE_FACTOR;
+				Node **temp_h = realloc(pq->elements, new_capacity * sizeof(Node*));
+				if (!temp_h) {
+								fprintf(stderr, "Error, could not reallocate new memory for the heap!\n");
+								exit(-1);
+				}
+
+				pq->elements = temp_h;
+				pq->capacity = new_capacity;
+
+				printf("New heap capacity extended to %lu.\n", pq->capacity);
+}
+
 void insert_queue(PriorityQueue *pq, Node *x)
 {
+				if (pq->size == pq->capacity) {
+								printf("Queue has reached maximum capicity: %lu / %lu!\n", pq->size, pq->capacity);
+								resize_queue(pq);
+				}
 				size_t index = pq->size;
 				pq->elements[index] = x;
 				pq->size++;
-				printf("Insert node with value: %d\n", x->value);
+				printf("Insert node with value: %d\n", x->heuristic);
 
 				while (index > 0) {
 								size_t p_index = (index - 1) / 2;
-								if (pq->elements[p_index]->value > pq->elements[index]->value) {
+								if (pq->elements[p_index]->heuristic > pq->elements[index]->heuristic) {
 												swap_nodes(pq, p_index, index);
 												index = p_index;
 								}
@@ -48,13 +68,12 @@ void insert_queue(PriorityQueue *pq, Node *x)
 
 }	
 
-void pop_queue(PriorityQueue *pq)
+Node* pop_queue(PriorityQueue *pq)
 {
 				if (!pq->size)
-								return;
+								return NULL;
 
 				Node *temp = pq->elements[0];
-				free(temp);
 
 				pq->elements[0] = pq->elements[pq->size - 1];
 				pq->size--;
@@ -66,10 +85,10 @@ void pop_queue(PriorityQueue *pq)
 								size_t left = index * 2 + 1;
 								size_t right = index * 2 + 2;
 
-								if (left < pq->size && pq->elements[left]->value < pq->elements[smallest]->value)
+								if (left < pq->size && pq->elements[left]->heuristic < pq->elements[smallest]->heuristic)
 												smallest = left;
 
-								if (right < pq->size && pq->elements[right]->value < pq->elements[smallest]->value)
+								if (right < pq->size && pq->elements[right]->heuristic < pq->elements[smallest]->heuristic)
 												smallest = right;
 
 								if (smallest != index) {
@@ -79,41 +98,29 @@ void pop_queue(PriorityQueue *pq)
 
 								else
 												break;
-				}				
+				}
+
+				return temp;
 }
+
+void print_heap_tree(PriorityQueue *pq, size_t index, int depth)
+{
+				if (index >= pq->size || depth > MAX_PRINT_DEPTH)
+								return;
+
+				print_heap_tree(pq, 2 * index + 2, depth + 1);
+
+				for (int i = 0; i < depth; i++)
+								printf("    ");
+				printf("|-- %d\n", pq->elements[index]->heuristic);
+				//for (uint8_t i = 0; i < pq->elements[index]->board.length; i++)
+								//printf("-%d", pq->elements[index]->board.pieces[i]);
+				print_heap_tree(pq, 2 * index + 1, depth + 1);
+}
+
 
 void print_queue(PriorityQueue pq)
 {
 				for (size_t i = 0; i < pq.size; i++)
-								printf("%d -> ", pq.elements[i]->value);
-}
-
-int main(void)
-{
-				PriorityQueue pq = {.size = 0, .capacity = 16};
-				Node **heap = malloc(sizeof(Node*) * pq.capacity); 
-				pq.elements = heap; 
-				Node *a = create_node(5);
-				insert_queue(&pq, a);
-
-				a = create_node(10);
-				insert_queue(&pq, a);
-				insert_queue(&pq, create_node(3));
-				insert_queue(&pq, create_node(81));
-				insert_queue(&pq, create_node(22));
-				insert_queue(&pq, create_node(43));
-				insert_queue(&pq, create_node(18));
-
-				print_queue(pq);
-				printf("\n\n");
-
-				pop_queue(&pq);
-				pop_queue(&pq);
-
-				print_queue(pq);
-
-				for (size_t i = 0; i < pq.size; i++)
-								free(pq.elements[i]);
-				free(pq.elements);
-				return 0;
+								printf("%d -> ", pq.elements[i]->heuristic);
 }
