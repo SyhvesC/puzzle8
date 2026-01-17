@@ -29,4 +29,9 @@ typedef enum {
 	RIGHT
 } Direction;
 
+typedef struct {
+	uint8_t moves[4];
+	uint8_t count;
+} MoveTable;
+
 #endif

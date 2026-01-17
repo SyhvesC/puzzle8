@@ -1,65 +1,63 @@
-#include "board.h"
+//#include "board.h"
 #include "pqueue.h"
+#include "node.h"
 
 #include <stdio.h>
 
 #define MAX_PRINT_DEPTH 5
 #define RESIZE_FACTOR 2
+#define INITIAL_CAPACITY 512
 
-Node *create_node(Node *parent, const Board *board, const int heuristic, const int depth)
+static void swap_nodes(PriorityQueue *queue, const size_t a, const size_t b)
 {
-	Node *node = malloc(sizeof(Node));
-	if (!node) {
-		fprintf(stderr, "Error, could not allocate memory for the node!");
-		exit(-1);
-	}
-
-	node->parent = parent;
-	node->board = *board;
-	node->heuristic = heuristic;
-	node->depth = depth;
-	node->f_cost = heuristic + depth;
-
-	return node;
+	Node *temp = queue->elements[a];
+	queue->elements[a] = queue->elements[b];
+	queue->elements[b] = temp;
 }
 
-static void swap_nodes(PriorityQueue *pq, const size_t a, const size_t b)
+static void resize_queue(PriorityQueue *queue)
 {
-	Node *temp = pq->elements[a];
-	pq->elements[a] = pq->elements[b];
-	pq->elements[b] = temp;
-}
-
-static void resize_queue(PriorityQueue *pq)
-{
-	size_t new_capacity = pq->capacity * RESIZE_FACTOR;
-	Node **temp_h = realloc(pq->elements, new_capacity * sizeof(Node*));
+	uint64_t new_capacity = queue->capacity * RESIZE_FACTOR;
+	Node **temp_h = realloc(queue->elements, new_capacity * sizeof(Node*));
 	if (!temp_h) {
 		fprintf(stderr, "Error, could not reallocate new memory for the heap!\n");
 		exit(-1);
 	}
 
-	pq->elements = temp_h;
-	pq->capacity = new_capacity;
+	queue->elements = temp_h;
+	queue->capacity = new_capacity;
 
-	printf("New heap capacity extended to %lu.\n", pq->capacity);
+	//printf("New heap capacity extended to %lu.\n", queue->capacity);
 }
 
-void insert_queue(PriorityQueue *pq, Node *x)
+PriorityQueue create_queue()
 {
-	if (pq->size == pq->capacity) {
-		printf("Queue has reached maximum capicity: %lu / %lu!\n", pq->size, pq->capacity);
-		resize_queue(pq);
+	PriorityQueue queue = {.size = 0, .capacity = INITIAL_CAPACITY};
+	Node **heap = malloc(sizeof(Node*) * queue.capacity);
+	if (!heap) {
+		fprintf(stderr, "Error, could not allocate memory for the heap.");
+		exit(-1);
 	}
-	size_t index = pq->size;
-	pq->elements[index] = x;
-	pq->size++;
+	queue.elements = heap;
+
+	return queue;
+}
+
+void insert_queue(PriorityQueue *queue, Node *x)
+{
+	if (queue->size == queue->capacity) {
+		//printf("Queue has reached maximum capicity: %lu / %lu!\n", queue->size, queue->capacity);
+		resize_queue(queue);
+	}
+	uint64_t index = queue->size;
+	queue->elements[index] = x;
+	queue->size++;
 	//printf("Insert node with value: %d\n", x->heuristic);
 
 	while (index > 0) {
 		size_t p_index = (index - 1) / 2;
-		if (pq->elements[p_index]->heuristic > pq->elements[index]->heuristic) {
-			swap_nodes(pq, p_index, index);
+		if (queue->elements[p_index]->f_cost > queue->elements[index]->f_cost) {
+			swap_nodes(queue, p_index, index);
 			index = p_index;
 		}
 		else
@@ -68,31 +66,35 @@ void insert_queue(PriorityQueue *pq, Node *x)
 
 }	
 
-Node* pop_queue(PriorityQueue *pq)
+Node* pop_queue(PriorityQueue *queue)
 {
-	if (!pq->size)
+	if (!queue->size)
 		return NULL;
 
-	Node *temp = pq->elements[0];
+	Node *temp = queue->elements[0];
+	if (temp == NULL) {
+		fprintf(stderr, "Error, could not pop node from queue!\n");
+		exit(-1);
+	}
 
-	pq->elements[0] = pq->elements[pq->size - 1];
-	pq->size--;
+	queue->elements[0] = queue->elements[queue->size - 1];
+	queue->size--;
 
-	size_t index = 0;
+	uint64_t index = 0;
 
 	while (1) {
-		size_t smallest = index;
-		size_t left = index * 2 + 1;
-		size_t right = index * 2 + 2;
+		uint64_t smallest = index;
+		uint64_t left = index * 2 + 1;
+		uint64_t right = index * 2 + 2;
 
-		if (left < pq->size && pq->elements[left]->heuristic < pq->elements[smallest]->heuristic)
+		if (left < queue->size && queue->elements[left]->f_cost < queue->elements[smallest]->f_cost)
 			smallest = left;
 
-		if (right < pq->size && pq->elements[right]->heuristic < pq->elements[smallest]->heuristic)
+		if (right < queue->size && queue->elements[right]->f_cost < queue->elements[smallest]->f_cost)
 			smallest = right;
 
 		if (smallest != index) {
-			swap_nodes(pq, index, smallest);
+			swap_nodes(queue, index, smallest);
 			index = smallest;
 		}
 
@@ -103,31 +105,33 @@ Node* pop_queue(PriorityQueue *pq)
 	return temp;
 }
 
-void print_heap_tree(PriorityQueue *pq, size_t index, int depth)
+void print_heap_tree(PriorityQueue *queue, size_t index, int depth)
 {
-	if (index >= pq->size || depth > MAX_PRINT_DEPTH)
+	if (index >= queue->size || depth > MAX_PRINT_DEPTH)
 		return;
 
-	print_heap_tree(pq, 2 * index + 2, depth + 1);
+	print_heap_tree(queue, 2 * index + 2, depth + 1);
 
 	for (int i = 0; i < depth; i++)
 		printf("    ");
-	printf("|-- %d  ", pq->elements[index]->heuristic);
+	printf("|-- %d  ", queue->elements[index]->heuristic);
 
 	// FOR DEBUGGING
 	// #############
-	for (uint8_t i = 0; i < pq->elements[index]->board.length; i++)
-		printf("-%d", pq->elements[index]->board.pieces[i]);
-	printf(" - idx: %d", pq->elements[index]->board.zero_index);
+	for (uint8_t i = 0; i < queue->elements[index]->board.length; i++)
+		printf("-%d", queue->elements[index]->board.pieces[i]);
+	printf(" - idx: %d", queue->elements[index]->board.zero_index);
 	// #############
 	//
 	printf("\n");
-	print_heap_tree(pq, 2 * index + 1, depth + 1);
+	print_heap_tree(queue, 2 * index + 1, depth + 1);
 }
 
-
-void print_queue(PriorityQueue pq)
+void destroy_queue(PriorityQueue *queue)
 {
-	for (size_t i = 0; i < pq.size; i++)
-		printf("%d -> ", pq.elements[i]->heuristic);
+	free(queue->elements);
+	queue->size = 0;
+	queue->capacity = 0;
 }
+
+

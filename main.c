@@ -1,12 +1,18 @@
 #include "board.h"
 #include "pqueue.h"
+#include "hashtable.h"
+#include "node.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdbool.h>
 
-SolveStatus check_game_inversions(Board *board)
+MoveTable *move_table;
+Node *winner;
+
+SolveStatus check_game_inversions(const Board *board)
 {
 	size_t n_inversions = 0;
 	for (uint8_t i = 0; i < board->length - 1; i++) {
@@ -19,8 +25,21 @@ SolveStatus check_game_inversions(Board *board)
 				n_inversions++;
 		}
 	}
+
 	printf("N of inversions: %lu\n", n_inversions);
-	return (n_inversions % 2 == 0) ? SOLVABLE : NOT_SOLVABLE;
+
+	SolveStatus is_solvable;
+
+	if ((board->side % 2) != 0) {
+		is_solvable = (n_inversions % 2 == 0) ? SOLVABLE : NOT_SOLVABLE;
+	} else {
+		size_t zero_row = board->zero_index / board->side;
+		printf("Zero index: %lu\n", zero_row);
+		is_solvable = ((n_inversions + zero_row) % 2 != 0) ? SOLVABLE : NOT_SOLVABLE;
+	}	
+	
+	return is_solvable;
+
 }
 
 Board create_board(const BoardType type, const uint8_t *state)
@@ -89,10 +108,20 @@ int8_t fetch_target_index(uint8_t zero_index, BoardType side, Direction dir)
 	}
 }
 
-SolveStatus find_next_states(PriorityQueue *queue, const Board *state)
+SolveStatus find_next_states(PriorityQueue *queue, HashTable *table)
 {
-	for (uint8_t i = 0; i < 4; i++) {
-		const int8_t target_index = fetch_target_index(state->zero_index, state->side, i);
+	Node *next = pop_queue(queue);
+	if (next->heuristic == 0) {
+		//insert_queue(queue, next);
+		winner = next;
+		return IS_SOLVED;
+	}
+
+	Board *state = &(next->board);
+
+	const MoveTable list = move_table[state->zero_index];
+	for (uint8_t i = 0; i < list.count; i++) {
+		const int8_t target_index = list.moves[i];
 		if (target_index == -1)
 			continue;
 
@@ -101,56 +130,86 @@ SolveStatus find_next_states(PriorityQueue *queue, const Board *state)
 		new_state.pieces[target_index] = 0;
 		new_state.zero_index = target_index;
 
-		Node *new_node = create_node(NULL, &new_state, distance(&new_state), 0);
-		if (new_node->heuristic == 0) {
+		if (!lookup_hash(table, &new_state)) {
+
+			Node *new_node = create_node(next, &new_state, distance(&new_state), next->depth + 1);
+			insert_hash_entry(table, new_node);
 			insert_queue(queue, new_node);
-			return IS_SOLVED;
-		}
-
-		insert_queue(queue, new_node);
-		//print_game_status(&new_state);
-		//printf("index of og struct: %d\n", state->zero_index);
+		}	
 	}
-
 	return NOT_SOLVED;
+}
+
+void print_solution(Node *node)
+{
+    if (node == NULL)
+		return; 
+    
+	print_solution(node->parent);
+
+    print_game_status(&node->board);
+    printf("Depth: %d, Cost: %d, Total: %d\n\n", node->depth, node->heuristic, node->f_cost);
+}
+
+void generate_move_table(const BoardType side)
+{
+	uint8_t length = side * side;
+	for (uint8_t zero_index = 0; zero_index < length; zero_index++) {
+		for (uint8_t i = 0; i < 4; i++) {
+			int8_t target_index = fetch_target_index(zero_index, side, i);
+			if (target_index != -1) {
+				move_table[zero_index].moves[move_table[zero_index].count++] = target_index;
+			}
+		}
+	}
 }
 
 int main(void)
 {
 	// Initial_state
-	uint8_t starting_state[PUZZLE_8 * PUZZLE_8] = {1, 8, 2, 3, 4, 5, 6, 7, 0};
+	uint8_t starting_state[PUZZLE_8 * PUZZLE_8] = {8, 7, 6, 5, 1, 3, 4, 2, 0};
 	Board start_board = create_board(PUZZLE_8, starting_state);
 
 	SolveStatus is_solvable = check_game_inversions(&start_board);
 	if (is_solvable == SOLVABLE)
 		printf("The starting board is solvable.\n");
-	else
+	else {
 		printf("The starting board is NOT solvable.\n");
-
-	print_game_status(&start_board);
-
-	// Start the queue
-	PriorityQueue queue = {.size = 0, .capacity = 16};
-	Node **heap = malloc(sizeof(Node*) * queue.capacity);
-	if (!heap) {
-		fprintf(stderr, "Error, could not allocate memory for the heap.");
 		exit(-1);
 	}
-	queue.elements = heap;
+
+	print_game_status(&start_board);
+	move_table = calloc(start_board.length, sizeof(MoveTable));
+	generate_move_table(start_board.side);
+
+	// Start the queue
+	PriorityQueue queue = create_queue();
+
+	// Create closed list which is a hash table
+	HashTable hash_table = create_hash_table();
 
 	// Create the first node;
 	Node *node = create_node(NULL, &start_board, distance(&start_board), 0);
 	insert_queue(&queue, node);
+	insert_hash_entry(&hash_table, node);
 
-	for (int i = 0; i < 10; i++) {
-		Node *next = pop_queue(&queue);
-		SolveStatus result = find_next_states(&queue, &next->board);
-		if (result == IS_SOLVED)
-			printf("Hooray!");
+	SolveStatus result = NOT_SOLVED;
+	while (result != IS_SOLVED) {
+		result = find_next_states(&queue, &hash_table);
+		if (hash_table.count > hash_table.size / 1.5)
+			break;
+		if (result == IS_SOLVED) {
+			printf("Hooray!\n");
+			break;
+		}
 	}	
 
-	print_heap_tree(&queue, 0, 0);
-	free(node);
-	free(queue.elements);
+	//print_heap_tree(&queue, 0, 0);
+	print_solution(winner);
+
+	free(move_table);
+	destroy_queue(&queue);
+	destroy_hash_table(&hash_table);
+
 	return 0;
 }
