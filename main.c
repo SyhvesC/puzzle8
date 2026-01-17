@@ -6,30 +6,6 @@
 #include <stdint.h>
 #include <string.h>
 
-
-const uint8_t GOAL_8[PUZZLE_8 * PUZZLE_8] = {1, 2, 3, 4, 5, 6, 7, 8};
-const uint8_t GOAL_15[PUZZLE_15 * PUZZLE_15] = {1, 2 ,3 ,4 , 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 0};
-
-
-void is_state_solved(Board *game)
-{
-	switch(game->side)	{
-		case PUZZLE_8:
-			if (memcmp(game->pieces, GOAL_8, sizeof(uint8_t) * game->length) == 0)
-				game->status = IS_SOLVED;
-			break;
-
-		case PUZZLE_15:
-			if (memcmp(game->pieces, GOAL_15, sizeof(uint8_t) * game->length) == 0)
-				game->status = IS_SOLVED;
-			break;
-
-		default:
-			fprintf(stderr, "Error, puzzle game with unknown 'side' value!");
-
-	}
-}
-
 SolveStatus check_game_inversions(Board *board)
 {
 	size_t n_inversions = 0;
@@ -98,8 +74,45 @@ int distance(const Board *game)
 		}
 	}
 
-	printf("M.Distance: %d\n", total_d);
+	//printf("M.Distance: %d\n", total_d);
 	return total_d;
+}
+
+int8_t fetch_target_index(uint8_t zero_index, BoardType side, Direction dir)
+{
+	switch(dir) {
+		case UP:    return (zero_index < side)				   ? -1 : (int8_t)(zero_index - side);
+		case DOWN:  return (zero_index >= side * (side - 1))   ? -1 : (int8_t)(zero_index + side);
+		case LEFT:  return ((zero_index % side) == 0)		   ? -1 : (int8_t)(zero_index - 1);
+		case RIGHT: return ((zero_index % side) == (side - 1)) ? -1 : (int8_t)(zero_index + 1);
+		default: return -1;
+	}
+}
+
+SolveStatus find_next_states(PriorityQueue *queue, const Board *state)
+{
+	for (uint8_t i = 0; i < 4; i++) {
+		const int8_t target_index = fetch_target_index(state->zero_index, state->side, i);
+		if (target_index == -1)
+			continue;
+
+		Board new_state = *state;
+		new_state.pieces[state->zero_index] = new_state.pieces[target_index];
+		new_state.pieces[target_index] = 0;
+		new_state.zero_index = target_index;
+
+		Node *new_node = create_node(NULL, &new_state, distance(&new_state), 0);
+		if (new_node->heuristic == 0) {
+			insert_queue(queue, new_node);
+			return IS_SOLVED;
+		}
+
+		insert_queue(queue, new_node);
+		//print_game_status(&new_state);
+		//printf("index of og struct: %d\n", state->zero_index);
+	}
+
+	return NOT_SOLVED;
 }
 
 int main(void)
@@ -126,10 +139,17 @@ int main(void)
 	queue.elements = heap;
 
 	// Create the first node;
-	Node *node = create_node(NULL, start_board, distance(&start_board), 0);
+	Node *node = create_node(NULL, &start_board, distance(&start_board), 0);
 	insert_queue(&queue, node);
-	print_heap_tree(&queue, 0, 0);
 
+	for (int i = 0; i < 10; i++) {
+		Node *next = pop_queue(&queue);
+		SolveStatus result = find_next_states(&queue, &next->board);
+		if (result == IS_SOLVED)
+			printf("Hooray!");
+	}	
+
+	print_heap_tree(&queue, 0, 0);
 	free(node);
 	free(queue.elements);
 	return 0;

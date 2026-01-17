@@ -3,10 +3,10 @@
 
 #include <stdio.h>
 
-#define MAX_PRINT_DEPTH 100
+#define MAX_PRINT_DEPTH 5
 #define RESIZE_FACTOR 2
 
-Node *create_node(Node *parent, const Board board, const int heuristic, const int depth)
+Node *create_node(Node *parent, const Board *board, const int heuristic, const int depth)
 {
 	Node *node = malloc(sizeof(Node));
 	if (!node) {
@@ -15,7 +15,7 @@ Node *create_node(Node *parent, const Board board, const int heuristic, const in
 	}
 
 	node->parent = parent;
-	node->board = board;
+	node->board = *board;
 	node->heuristic = heuristic;
 	node->depth = depth;
 	node->f_cost = heuristic + depth;
@@ -54,7 +54,7 @@ void insert_queue(PriorityQueue *pq, Node *x)
 	size_t index = pq->size;
 	pq->elements[index] = x;
 	pq->size++;
-	printf("Insert node with value: %d\n", x->heuristic);
+	//printf("Insert node with value: %d\n", x->heuristic);
 
 	while (index > 0) {
 		size_t p_index = (index - 1) / 2;
@@ -112,9 +112,16 @@ void print_heap_tree(PriorityQueue *pq, size_t index, int depth)
 
 	for (int i = 0; i < depth; i++)
 		printf("    ");
-	printf("|-- %d\n", pq->elements[index]->heuristic);
-	//for (uint8_t i = 0; i < pq->elements[index]->board.length; i++)
-	//printf("-%d", pq->elements[index]->board.pieces[i]);
+	printf("|-- %d  ", pq->elements[index]->heuristic);
+
+	// FOR DEBUGGING
+	// #############
+	for (uint8_t i = 0; i < pq->elements[index]->board.length; i++)
+		printf("-%d", pq->elements[index]->board.pieces[i]);
+	printf(" - idx: %d", pq->elements[index]->board.zero_index);
+	// #############
+	//
+	printf("\n");
 	print_heap_tree(pq, 2 * index + 1, depth + 1);
 }
 

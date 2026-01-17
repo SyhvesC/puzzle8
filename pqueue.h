@@ -21,7 +21,7 @@ typedef struct {
 } PriorityQueue;
 
 
-Node *create_node(Node *parent, const Board board, const int heuristic, const int depth);
+Node *create_node(Node *parent, const Board *board, const int heuristic, const int depth);
 
 void insert_queue(PriorityQueue *pq, Node *x);
 Node *pop_queue(PriorityQueue *pq);
