@@ -1,3 +1,5 @@
 ## Usage
 
 make
+
+./puzzle
