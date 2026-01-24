@@ -1,6 +1,6 @@
 //#include "board.h"
 #include "pqueue.h"
-#include "node.h"
+#include "board.h"
 
 #include <stdio.h>
 
@@ -11,8 +11,12 @@
 static void swap_nodes(PriorityQueue *queue, const size_t a, const size_t b)
 {
 	Node *temp = queue->elements[a];
+	temp->heap_index = a;
 	queue->elements[a] = queue->elements[b];
+	queue->elements[a]->heap_index = b;
 	queue->elements[b] = temp;
+
+
 }
 
 static void resize_queue(PriorityQueue *queue)
@@ -43,17 +47,8 @@ PriorityQueue create_queue()
 	return queue;
 }
 
-void insert_queue(PriorityQueue *queue, Node *x)
+void min_heapify(PriorityQueue *queue, uint64_t index)
 {
-	if (queue->size == queue->capacity) {
-		//printf("Queue has reached maximum capicity: %lu / %lu!\n", queue->size, queue->capacity);
-		resize_queue(queue);
-	}
-	uint64_t index = queue->size;
-	queue->elements[index] = x;
-	queue->size++;
-	//printf("Insert node with value: %d\n", x->heuristic);
-
 	while (index > 0) {
 		size_t p_index = (index - 1) / 2;
 		if (queue->elements[p_index]->f_cost > queue->elements[index]->f_cost) {
@@ -61,9 +56,21 @@ void insert_queue(PriorityQueue *queue, Node *x)
 			index = p_index;
 		}
 		else
-		break;
+			break;
 	}
+}
 
+void insert_queue(PriorityQueue *queue, Node *node)
+{
+	if (queue->size == queue->capacity) {
+		//printf("Queue has reached maximum capicity: %lu / %lu!\n", queue->size, queue->capacity);
+		resize_queue(queue);
+	}
+	uint64_t index = queue->size;
+	queue->elements[index] = node;
+	node->heap_index = index;
+	queue->size++;
+	min_heapify(queue, index);
 }	
 
 Node* pop_queue(PriorityQueue *queue)
@@ -99,13 +106,13 @@ Node* pop_queue(PriorityQueue *queue)
 		}
 
 		else
-		break;
+			break;
 	}
 
 	return temp;
 }
 
-void print_heap_tree(PriorityQueue *queue, size_t index, int depth)
+/*void print_heap_tree(PriorityQueue *queue, size_t index, int depth)
 {
 	if (index >= queue->size || depth > MAX_PRINT_DEPTH)
 		return;
@@ -125,7 +132,7 @@ void print_heap_tree(PriorityQueue *queue, size_t index, int depth)
 	//
 	printf("\n");
 	print_heap_tree(queue, 2 * index + 1, depth + 1);
-}
+}*/
 
 void destroy_queue(PriorityQueue *queue)
 {

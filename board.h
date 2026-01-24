@@ -9,11 +9,19 @@ typedef enum {
 } BoardType;
 
 typedef struct {
-	uint8_t pieces[16];
-	uint8_t length;
-	uint8_t zero_index;
+	uint64_t pieces;
 	BoardType side;
+	uint8_t zero_index;
 } Board;
+
+typedef struct Node {
+	struct Node *parent;
+	int64_t heap_index;
+	uint8_t heuristic;
+	uint8_t depth;
+	uint8_t f_cost;
+	Board board;
+} Node;
 
 typedef enum {
 	NOT_SOLVABLE,

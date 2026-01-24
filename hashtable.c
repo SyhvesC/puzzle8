@@ -1,6 +1,5 @@
 #include "hashtable.h"
 #include "board.h"
-#include "node.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -8,17 +7,17 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define INITIAL_CAPACITY 1000003
+#define INITIAL_CAPACITY 100000007
 
 static uint32_t generate_hash(const Board *board)
 {
-	uint32_t hash = 5381;
+	uint64_t x = board->pieces;
 
-    for (uint8_t i = 0; i < board->length; i++) {
-        hash = ((hash << 5) + hash) + board->pieces[i];
-    }
-
-    return hash;
+	// XorShift
+    x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    x = (x ^ (x >> 27)) * 0x94d049bb133111ebULL;
+    x = x ^ (x >> 31);
+    return (uint32_t)x;
 }
 
 HashTable create_hash_table()
@@ -54,18 +53,18 @@ void insert_hash_entry(HashTable *table, Node* node)
 		table->collisions++;
 }
 
-bool lookup_hash(HashTable *table, Board *board)
+Node* lookup_hash(HashTable *table, Board *board)
 {
 	uint32_t index = generate_hash(board) % table->size;
 	HashEntry *entry = table->entries[index];
 
 	while (entry != NULL) {
-		if (memcmp(entry->node->board.pieces, board->pieces, board->length) == 0) {
-			return true;
+		if (entry->node->board.pieces == board->pieces) {
+			return entry->node;
 		}
 		entry = entry->next;
 	}
-	return false;
+	return NULL;
 }
 
 void destroy_hash_table(HashTable *t)

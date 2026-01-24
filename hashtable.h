@@ -1,7 +1,7 @@
 #ifndef HASHTABLE_H
 #define HASHTABLE_H
 
-#include "node.h"
+#include "board.h"
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -20,7 +20,7 @@ typedef struct {
 
 HashTable create_hash_table();
 void insert_hash_entry(HashTable *table, Node* node);
-bool lookup_hash(HashTable *table, Board *board);
+Node* lookup_hash(HashTable *table, Board *board);
 void destroy_hash_table(HashTable *t);
 
 #endif
